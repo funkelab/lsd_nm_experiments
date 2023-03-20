@@ -7,3 +7,4 @@ log*
 *.meta
 *.json
 !01_data/datasets.json
+*.img
