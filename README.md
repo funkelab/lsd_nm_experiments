@@ -1,6 +1,8 @@
-Tested on Ubuntu 18.04 with Quadro P6000 (24gb gpu ram)
+# LSD NM experiments tutorial
 
----
+## General notes
+
+* Tested on Ubuntu 18.04 with Quadro P6000 (24gb gpu ram)
 
 * Assuming `singularity` is installed and setup 
 (some tutorials [here](https://docs.sylabs.io/guides/3.5/user-guide/quick_start.html) and
@@ -10,15 +12,15 @@ Tested on Ubuntu 18.04 with Quadro P6000 (24gb gpu ram)
 
 ---
 
-Clone this repo:
+## Getting started
+
+* Clone this repo:
 
 ```
 git clone https://github.com/funkelab/lsd_nm_experiments.git
 ```
 
----
-
-Create simple environment for fetching containers:
+* Create simple environment for fetching containers:
 
 ```
 conda create -n test_env python=3.8
@@ -39,7 +41,7 @@ pip install boto3 neuroglancer h5py zarr
 
 ---
 
-Downloading container(s)
+## Downloading container(s)
 
 * `download_imgs.py` will download the singularity container used in the paper (`lsd:v0.8.img`)
 * We found that sometimes this singularity container throws errors because of deprecated cuda versions that don't play well with updated drivers
@@ -52,7 +54,7 @@ python download_imgs.py
 
 ---
 
-Or building legacy container from source:
+## Or building legacy container from source:
 
 * Nvidia has deprecated the conda packages of the cudnn / cudatoolkit versions used in the original singularity container (6.0/8.0)
 * This sometimes causes problems with updated drivers (even though the point of containerization is to solve this...)
@@ -76,7 +78,7 @@ Or building legacy container from source:
 
 ---
 
-Fetching data
+## Fetching data
 
 * Navigate to 01_data directory (`cd 01_data`)
 * `fetch_data.py` will download training data from the aws bucket using a json file (`datasets.json`) specifying the training volumes for each dataset
@@ -91,7 +93,7 @@ python fetch_data.py
 
 --- 
 
-Creating masks
+## Creating masks
 
 * `create_masks.py` will create a `labels_mask` that we use for training to constrain random locations
 * If you installed zarr into the conda environment, you can just run with:
@@ -110,7 +112,7 @@ singularity exec --nv ../lsd:v0.8.img python create_masks.py
 
 --- 
 
-Viewing the data
+## Viewing the data
 
 * If you installed neuroglancer into your environment, you can view the data with `view_data.py`
 * e.g `python -i view_data.py -d funke/fib25/training/tstvol-520-1.zarr`
@@ -119,12 +121,16 @@ Viewing the data
 [here](https://github.com/funkelab/funlib.show.neuroglancer), [here](https://connectomics.readthedocs.io/en/latest/external/neuroglancer.html)
 and [here](https://github.com/google/neuroglancer/tree/master/python/examples)
 
+Example fib25 training data:
+
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/fib25_training_data.png)
+
 ---
 
-Downloading network checkpoints
+## Downloading network checkpoints
 
 * `fetch_checkpoint.py` will download a specified network checkpoint for a given dataset to the target folder in `02_train`
-* We can start with the baseline affinities for the zebrafinch dataset just using boto3 (or use singularity if desired):
+* We can start with the baseline affinities for the zebrafinch dataset just using conda boto3 (or use singularity if desired):
 
 ```
 python fetch_checkpoint.py
@@ -132,7 +138,7 @@ python fetch_checkpoint.py
 
 --- 
 
-Training a network
+## Training a network
 
 * Navigate to the zebrafinch baseline directory (`cd ../02_train/zebrafinch/baseline`)
 * We start by creating our network in `mknet.py` (e.g placeholders to match to the trained graphs):
@@ -169,7 +175,12 @@ singularity exec --nv ../../../lsd:v0.8.img python train.py 1
 
 * You'll see that gunpowder will print `ERROR:tensorflow:Couldn't match files for checkpoint ./train_net_checkpoint_500000`
 * This is because it checks the `checkpoint` file which specifies iteration 500000 (since this network was trained for longer than the optimal checkpoint)
-* Simply edit this file to point to the downloaded checkpoint iteration instead (e.g 500000 -> 400000)
+
+* If we view the batch, we'll see that the predictions are all grey, since it really only trained for a single iteration and didn't use the checkpoint (`python -i view_batch.py -f snapshots/batch_1.hdf`):
+
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/baseline_zfinch_batch_1.png)
+
+* To fix, simply edit this `checkpoint` file to point to the downloaded checkpoint iteration instead (e.g 500000 -> 400000)
 * Now running the above won't do anything, because of line 27 in `train.py`:
 
 ```py
@@ -189,9 +200,11 @@ singularity exec --nv ../../../lsd:v0.8.img python train.py 400001
 python -i view_batch.py -f snapshots/batch_400001.hdf
 ```
 
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/baseline_zfinch_batch_400k.png)
+
 ---
 
-Running Inference
+## Running Inference
 
 * For the lsds experiments, we ran everything from inference through evaluation in a blockwise fashion using [daisy](https://github.com/funkelab/daisy)
 * For inference, this meant having a blockwise prediction script that called a gunpowder predict pipeline inside each process
@@ -204,9 +217,13 @@ Running Inference
 singularity exec --nv ../../../lsd:v0.8.img python predict_scan.py
 ```
 
+* Resulting affinities:
+
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/baseline_zfinch_preds.png) 
+
 ---
 
-Multitask (MTLSD)
+## Multitask (MTLSD)
 
 * This can be run exactly the same as the baseline above. 
 * Inside `01_data/fetch_checkpoint.py`, uncomment `mtlsd` and run. 
@@ -217,12 +234,56 @@ Multitask (MTLSD)
 * View batch (`... python -i view_batch.py ...`) -> will also show LSDs
 * Predict (`... python predict_scan.py`) -> will write out LSDs and Affs
 
+* This will also give us LSDs:
+
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/mtlsd_zfinch_preds_lsds.png)
+
+* Tip - you can view the different components of the LSDs by adjusting the shader in neuroglancer, e.g changing `0,1,2` to `3,4,5` will show the diagonal entries of the covariance component (or the direction the processes move):
+
+```
+void main() {
+    emitRGB(
+        vec3(
+            toNormalized(getDataValue(3)),
+            toNormalized(getDataValue(4)),
+            toNormalized(getDataValue(5)))
+        );
+}
+```
+
+* Or to view a single channel of the 10d lsds, (e.g channel 6):
+
+```
+void main() {
+    float v = toNormalized(getDataValue(6));
+    vec4 rgba = vec4(0,0,0,0);
+    if (v != 0.0) {
+        rgba = vec4(colormapJet(v), 1.0);
+    }
+    emitRGBA(rgba);
+}
+```
+
 --- 
 
-Autocontext (ACLSD and ACRLSD)
+## Autocontext (ACLSD and ACRLSD)
 
 * These networks rely on a pretrained LSD (raw -> LSDs) network, eg:
-* ACLSD: Raw -> LSDs -> Affs
-* ACRLSD: Raw -> LSDs + cropped Raw -> Affs
+* ACLSD: `Raw -> LSDs -> Affs`
+* ACRLSD: `Raw -> LSDs + cropped Raw -> Affs`
 * Because of this, they are more computationally expensive (since training requires extra context to first predict the lsds)
 * They ran using 23.5 GB of available 24 GB GPU RAM when testing on quadro p6000. If you have less than that you will likely run into cuda OOM errors
+* If you have access to sufficient gpu memory, to start navigate to `01_data` and uncomment `lsd` + run script to get the pretrained lsd checkpoint
+* Go to lsd directory (`cd ../02_train/zebrafinch/lsd`) and follow same instructions as baseline and mtlsd nets above
+* Once you have the lsd checkpoints (and `test_prediction.zarr` with `pred_lsds` following prediction), start with a basic autocontext network (aclsd).
+* Get the aclsd checkpoint, navigate to appropriate directory, change checkpoint file as before and train network.
+* Visualizing the resulting batch shows us the larger raw context needed for predicting the lsds to ensure that the output affinities remain the same size:
+
+![](https://github.com/funkelab/lsd_nm_experiments/blob/master/static/aclsd_training_batch.png)
+
+* Run prediction as before - note, will not run if lsds have not been predicted first. This script could be adapted to predict the lsds on-the-fly using just the lsds and affs checkpoints
+* The same can be done for the ACRLSD network (note, requires a merge provider during prediction as this network takes both lsds and raw data as input) 
+
+---
+
+## Todos: add consolidated fib25/hemi nets to tutorial
