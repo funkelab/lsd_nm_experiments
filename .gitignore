@@ -8,3 +8,4 @@ log*
 *.json
 !01_data/datasets.json
 *.img
+.DS_Store
