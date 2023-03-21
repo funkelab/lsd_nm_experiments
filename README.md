@@ -2,6 +2,9 @@
 
 ## General notes
 
+* A tutorial for running training/inference of networks used for paper (in
+  singularity containers).
+
 * Tested on Ubuntu 18.04 with Quadro P6000 (24gb gpu ram)
 
 * Assuming `singularity` is installed and setup 

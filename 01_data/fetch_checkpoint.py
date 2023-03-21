@@ -4,9 +4,9 @@ import os
 
 if __name__ == "__main__":
     # set bucket credentials
-    access_key = "AKIA4XXGEV6ZQOTMTHX6"
-    secret_key = "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"
-    bucket_name = "open-neurodata"
+    access_key = ""
+    secret_key = ""
+    bucket_name = ""
 
     resource = boto3.resource(
         "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
