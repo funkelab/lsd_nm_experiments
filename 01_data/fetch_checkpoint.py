@@ -1,16 +1,13 @@
 import boto3
 import os
+from botocore import UNSIGNED
+from botocore.config import Config
 
 
 if __name__ == "__main__":
-    # set bucket credentials
-    access_key = ""
-    secret_key = ""
-    bucket_name = ""
+    bucket_name = "open-neurodata"
 
-    resource = boto3.resource(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-    )
+    resource = boto3.resource("s3", config=Config(signature_version=UNSIGNED))
 
     bucket = resource.Bucket(bucket_name)
 

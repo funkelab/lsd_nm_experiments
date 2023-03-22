@@ -2,25 +2,23 @@ import boto3
 import json
 import multiprocessing as mp
 import os
+from botocore import UNSIGNED
+from botocore.config import Config
 
-s3_client = None
+client = None
 
 
 def initialize(access_key, secret_key):
-    global s3_client
+    global client
 
-    s3_client = boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-    )
+    client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
 
 
 # function to download all files nested in a bucket path
 def download_data(job):
     bucket_name, path = job
 
-    resource = boto3.resource(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-    )
+    resource = boto3.resource("s3", config=Config(signature_version=UNSIGNED))
 
     bucket = resource.Bucket(bucket_name)
 
@@ -34,10 +32,7 @@ def download_data(job):
 
 
 if __name__ == "__main__":
-    # set bucket credentials
-    access_key = ""
-    secret_key = ""
-    bucket = ""
+    bucket = "open-neurodata"
 
     # load training data
     with open("datasets.json") as f:

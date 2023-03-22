@@ -1,15 +1,12 @@
 import boto3
 import os
+from botocore import UNSIGNED
+from botocore.config import Config
 
 if __name__ == "__main__":
-    # set bucket credentials
-    access_key = ""
-    secret_key = ""
-    bucket = ""
+    bucket = "open-neurodata"
 
-    client = boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-    )
+    client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
 
     files = [
         "lsd:v0.8.img",
